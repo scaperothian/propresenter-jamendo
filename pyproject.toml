@@ -1,0 +1,29 @@
+[project]
+name = "propresenter-jamendo"
+version = "0.1.0"
+description = "ProPresenter integration with Jamendo royalty-free music"
+authors = [
+    {name = "das", email = "scaperoth@berkeley.edu"}
+]
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = []
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+]
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry]
+packages = [{include = "propresenter_jamendo", from = "src"}]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+
+[tool.poetry.group.dev.dependencies]
+pytest = ">=8.0"
