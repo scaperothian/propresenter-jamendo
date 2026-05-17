@@ -78,3 +78,6 @@ logs/
 
 # pyc files
 *.pyc
+
+# default output directory for downloaded files
+output

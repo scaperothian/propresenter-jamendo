@@ -86,23 +86,74 @@ poetry install            # install all declared deps into active venv
 
 | Package | Purpose |
 |---------|---------|
-| pytest  | Test runner |
+| pytest | Test runner |
+| datasets | HuggingFace dataset library |
+| huggingface-hub | Download files from HuggingFace Hub |
+| torch 2.7.0 | PyTorch (pinned; needed for future audio tasks) |
+| torchaudio 2.7.0 | Audio I/O (pinned to match torch) |
 
 Add new critical dependencies to this table when introduced.
+
+### System Dependencies
+
+| Tool | Purpose | Install |
+|------|---------|---------|
+| ffmpeg | MP3 → WAV conversion in `audio.py` | `brew install ffmpeg` |
+
+### Python Version
+
+This project requires **Python 3.13** (not 3.15+). The `pyarrow` and `torch` packages do not yet provide wheels for Python 3.15 alpha. If the venv was created with the wrong interpreter, recreate it:
+
+```bash
+rm -rf venv
+/opt/homebrew/bin/python3.13 -m venv venv
+source venv/bin/activate
+poetry install
+```
+
+## Architecture
+
+The package has one module per responsibility:
+
+| Module | Responsibility |
+|--------|---------------|
+| `cli.py` | Argument parsing; orchestrates the pipeline for each song |
+| `downloader.py` | Fetches `subsets/en/metadata.jsonl` from HuggingFace (no audio encoding step) |
+| `formatter.py` | Groups lyric lines into pairs for `.txt` output; sanitizes filenames |
+| `audio.py` | Downloads the per-song MP3 and converts to WAV via `ffmpeg` subprocess |
+| `presentation.py` | Pairs lyric lines with timing data; builds the ProPresenter JSON structure |
+
+### Why `metadata.jsonl` instead of `load_dataset`?
+
+The `jamendolyrics/jam-alt` dataset uses a generator-based builder that calls `encode_example` on every record, including the audio column. Encoding audio requires `torchcodec`, which has no Python 3.13 wheel. Loading `subsets/en/metadata.jsonl` directly via `hf_hub_download` bypasses this step entirely while providing the same lyric/timing data. Audio files are downloaded separately in `audio.py`.
+
+### JSON presentation format
+
+Matches the schema used by `../propresenter-train`. Key fields:
+
+- `id.audio` — absolute path to the local WAV file
+- `slides[*]["start time"]` / `slides[*]["stop time"]` — note the spaces in these keys
+- `stop time` of slide N equals `start time` of slide N+1 (chained)
+- `has_timeline: false`, `destination: "presentation"` required by the consumer
 
 ## Project Structure
 
 ```
 propresenter-jamendo/
 ├── src/
-│   └── propresenter_jamendo/   # Main package
-├── tests/                      # Pytest suite
-├── venv/                       # Local Python environment (not in git)
-├── pyproject.toml              # Dependency declarations (Poetry)
-├── poetry.toml                 # Poetry local config
-├── .gitignore                  # Python + venv gitignore
+│   └── propresenter_jamendo/
+│       ├── cli.py            # CLI entry point
+│       ├── downloader.py     # HuggingFace metadata fetch
+│       ├── formatter.py      # Lyric pairing and filename sanitization
+│       ├── audio.py          # MP3 download + WAV conversion
+│       └── presentation.py   # ProPresenter JSON builder
+├── tests/                    # Pytest suite (mirrors src/ structure)
+├── venv/                     # Local Python environment (not in git)
+├── pyproject.toml            # Dependency declarations (Poetry)
+├── poetry.toml               # Poetry local config
+├── .gitignore                # Python + venv gitignore
 ├── README.md
-└── CLAUDE.md                   # This file
+└── CLAUDE.md                 # This file
 ```
 
 ## Summary of Rules
