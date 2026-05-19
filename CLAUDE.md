@@ -91,6 +91,7 @@ poetry install            # install all declared deps into active venv
 | huggingface-hub | Download files from HuggingFace Hub |
 | torch 2.7.0 | PyTorch (pinned; needed for future audio tasks) |
 | torchaudio 2.7.0 | Audio I/O (pinned to match torch) |
+| yt-dlp | YouTube search and audio/caption download in `youtube_live.py` |
 
 Add new critical dependencies to this table when introduced.
 
@@ -98,7 +99,7 @@ Add new critical dependencies to this table when introduced.
 
 | Tool | Purpose | Install |
 |------|---------|---------|
-| ffmpeg | MP3 → WAV conversion in `audio.py` | `brew install ffmpeg` |
+| ffmpeg | MP3 → WAV conversion in `audio.py` and `youtube_live.py` | `brew install ffmpeg` |
 
 ### Python Version
 
@@ -122,6 +123,47 @@ The package has one module per responsibility:
 | `formatter.py` | Groups lyric lines into pairs for `.txt` output; sanitizes filenames |
 | `audio.py` | Downloads the per-song MP3 and converts to WAV via `ffmpeg` subprocess |
 | `presentation.py` | Pairs lyric lines with timing data; builds the ProPresenter JSON structure |
+| `youtube_live.py` | Searches YouTube for live performances; downloads `<name>_live.wav` + captions via `yt-dlp` |
+
+### CLI flags
+
+| Flag | Description |
+|------|-------------|
+| `--output-dir DIR` | Required. Directory where all output files are written |
+| `--youtube-live` | Enable YouTube live performance search and download |
+
+### YouTube live search logic (`youtube_live.py`)
+
+`find_and_download_live(song, output_dir)` returns `(wav_path, caption_path, youtube_url)`.
+
+Candidate filtering in `_is_live_candidate`:
+- Title must contain at least one of: `live`, `concert`, `session`, `acoustic`, `unplugged`
+- Artist name must appear in the video title **or** the YouTube channel/uploader name
+- Video duration must differ from the studio track by more than 10% (rejects studio recordings re-uploaded with "live" in the title)
+
+### `found-live-results.json` schema and lifecycle
+
+Written to `<output-dir>/found-live-results.json` when `--youtube-live` is used. Contains **only** songs where a live performance was found. Schema per entry:
+
+```json
+{
+  "artist": "HILA",
+  "song": "Bad Side",
+  "duration": "3:24",
+  "youtube_url": "https://www.youtube.com/watch?v=...",
+  "captions_available": "yes",
+  "reject": "no"
+}
+```
+
+Skip / re-download logic (checked in this order per song):
+
+1. Entry in JSON with `reject: yes` → skip permanently, never re-search
+2. Entry in JSON with `reject: no` and WAV file present on disk → skip
+3. Entry in JSON with `reject: no` but WAV file **missing** → re-download
+4. No entry in JSON → search YouTube
+
+If a re-download fails (no live performance found), the entry is removed from the JSON so the next run will try again. New entries are always written with `"reject": "no"`.
 
 ### Why `metadata.jsonl` instead of `load_dataset`?
 
@@ -142,11 +184,12 @@ Matches the schema used by `../propresenter-train`. Key fields:
 propresenter-jamendo/
 ├── src/
 │   └── propresenter_jamendo/
-│       ├── cli.py            # CLI entry point
+│       ├── cli.py            # CLI entry point (--output-dir, --youtube-live)
 │       ├── downloader.py     # HuggingFace metadata fetch
 │       ├── formatter.py      # Lyric pairing and filename sanitization
 │       ├── audio.py          # MP3 download + WAV conversion
-│       └── presentation.py   # ProPresenter JSON builder
+│       ├── presentation.py   # ProPresenter JSON builder
+│       └── youtube_live.py   # YouTube live search + yt-dlp download
 ├── tests/                    # Pytest suite (mirrors src/ structure)
 ├── venv/                     # Local Python environment (not in git)
 ├── pyproject.toml            # Dependency declarations (Poetry)
