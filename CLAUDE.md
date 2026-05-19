@@ -151,19 +151,25 @@ Written to `<output-dir>/found-live-results.json` when `--youtube-live` is used.
   "song": "Bad Side",
   "duration": "3:24",
   "youtube_url": "https://www.youtube.com/watch?v=...",
+  "downloaded_url": "https://www.youtube.com/watch?v=...",
   "captions_available": "yes",
   "reject": "no"
 }
 ```
 
+`youtube_url` is the URL to use on the next download. `downloaded_url` is the URL that produced the current WAV file on disk. They are equal under normal operation; a mismatch means the user has manually changed `youtube_url` and a re-download is needed.
+
 Skip / re-download logic (checked in this order per song):
 
 1. Entry in JSON with `reject: yes` → skip permanently, never re-search
-2. Entry in JSON with `reject: no` and WAV file present on disk → skip
-3. Entry in JSON with `reject: no` but WAV file **missing** → re-download
-4. No entry in JSON → search YouTube
+2. Entry in JSON and `youtube_url != downloaded_url` → re-download from `youtube_url`, update `downloaded_url` on success
+3. Entry in JSON with WAV file present on disk → skip
+4. Entry in JSON but WAV file **missing** → re-download from `youtube_url`
+5. No entry in JSON → search YouTube
 
-If a re-download fails (no live performance found), the entry is removed from the JSON so the next run will try again. New entries are always written with `"reject": "no"`.
+If a re-download fails the entry is removed from the JSON so the next run will try again. New entries are always written with `"reject": "no"` and `downloaded_url` equal to `youtube_url`.
+
+**Backward compatibility:** entries written before `downloaded_url` was introduced (field absent) are treated as if `downloaded_url == youtube_url` — no spurious re-download is triggered.
 
 ### Why `metadata.jsonl` instead of `load_dataset`?
 

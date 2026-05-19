@@ -73,6 +73,16 @@ If a downloaded live performance is not acceptable (wrong song, poor quality, et
 
 On the next run the program will skip that song permanently and never re-search it.
 
+### Using a specific YouTube URL
+
+If you find a better live performance manually and want the program to download it:
+
+1. Open `found-live-results.json`
+2. Change `"youtube_url"` to the new URL (leave `"downloaded_url"` unchanged)
+3. Save the file and re-run with `--youtube-live`
+
+The program detects that `youtube_url` and `downloaded_url` differ, fetches the new video, and updates `downloaded_url` to match on success.
+
 `found-live-results.json` only contains songs where a live performance was successfully found. Its schema:
 
 ```json
@@ -82,6 +92,7 @@ On the next run the program will skip that song permanently and never re-search 
     "song": "Bad Side",
     "duration": "3:24",
     "youtube_url": "https://www.youtube.com/watch?v=...",
+    "downloaded_url": "https://www.youtube.com/watch?v=...",
     "captions_available": "yes",
     "reject": "no"
   }

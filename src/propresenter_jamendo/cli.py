@@ -6,7 +6,11 @@ from propresenter_jamendo.audio import download_audio
 from propresenter_jamendo.downloader import download_english_songs, extract_lines
 from propresenter_jamendo.formatter import format_lyrics, safe_filename
 from propresenter_jamendo.presentation import build_presentation
-from propresenter_jamendo.youtube_live import find_and_download_live, get_studio_duration
+from propresenter_jamendo.youtube_live import (
+    download_live_from_url,
+    find_and_download_live,
+    get_studio_duration,
+)
 
 
 def _format_duration(seconds: float | None) -> str | None:
@@ -81,15 +85,32 @@ def main() -> None:
             if existing and existing.get("reject", "no") == "yes":
                 print("    → rejected (skipping)")
             elif existing:
+                current_url = existing.get("youtube_url")
+                # Missing downloaded_url means the entry pre-dates this field;
+                # treat it as matching current_url so we don't force a re-download.
+                downloaded_url = existing.get("downloaded_url", current_url)
                 live_wav_path = args.output_dir / f"{safe_filename(title)}_live.wav"
-                if live_wav_path.exists():
+
+                if current_url and current_url != downloaded_url:
+                    # User changed youtube_url in the JSON — fetch the new one
+                    print("    → URL updated, re-downloading from new URL…")
+                    live_wav, live_cap = download_live_from_url(current_url, song, args.output_dir)
+                    if live_wav:
+                        existing["downloaded_url"] = current_url
+                        existing["captions_available"] = "yes" if live_cap else "no"
+                        print(f"    → live audio: {live_wav.name}")
+                        if live_cap:
+                            print(f"    → captions: {live_cap.name}")
+                    else:
+                        print("    → download failed (URL kept, will retry next run)")
+                elif live_wav_path.exists():
                     print("    → already found (skipping)")
                 else:
-                    # Audio was deleted or never saved — re-download
+                    # Audio was deleted — re-download from the recorded URL
                     print("    → audio missing, re-downloading…")
-                    live_wav, live_cap, live_url = find_and_download_live(song, args.output_dir)
+                    live_wav, live_cap = download_live_from_url(current_url, song, args.output_dir)
                     if live_wav:
-                        existing["youtube_url"] = live_url
+                        existing["downloaded_url"] = current_url
                         existing["captions_available"] = "yes" if live_cap else "no"
                         print(f"    → live audio: {live_wav.name}")
                         if live_cap:
@@ -97,7 +118,7 @@ def main() -> None:
                     else:
                         # Can't recover — remove so the next run will try again
                         del entries_map[key]
-                        print("    → no live performance found")
+                        print("    → download failed, will retry next run")
             else:
                 print("    → searching YouTube for live performance…")
                 live_wav, live_cap, live_url = find_and_download_live(song, args.output_dir)
@@ -107,6 +128,7 @@ def main() -> None:
                         "song": title,
                         "duration": _format_duration(get_studio_duration(song)),
                         "youtube_url": live_url,
+                        "downloaded_url": live_url,
                         "captions_available": "yes" if live_cap else "no",
                         "reject": "no",
                     }

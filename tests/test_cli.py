@@ -173,45 +173,120 @@ class TestLiveResults:
         entry = json.loads((tmp_path / RESULTS_FILE).read_text())[0]
         assert entry["reject"] == "no"
 
+    def test_new_entry_has_downloaded_url(self, tmp_path):
+        wav = tmp_path / "Song One_live.wav"
+        wav.touch()
+        _run_main_with_live(
+            tmp_path, live_return=(wav, None, self.URL), songs=[FAKE_SONGS[0]]
+        )
+        entry = json.loads((tmp_path / RESULTS_FILE).read_text())[0]
+        assert entry["downloaded_url"] == self.URL
+
     def test_skips_when_audio_present(self, tmp_path):
-        # Audio file exists on disk — should not call find_and_download_live
         wav = tmp_path / "Song One_live.wav"
         wav.touch()
         existing = [{
             "artist": "Artist A", "song": "Song One", "duration": "0:03",
-            "youtube_url": self.URL, "captions_available": "no", "reject": "no",
+            "youtube_url": self.URL, "downloaded_url": self.URL,
+            "captions_available": "no", "reject": "no",
         }]
         (tmp_path / RESULTS_FILE).write_text(json.dumps(existing), encoding="utf-8")
-        with patch("propresenter_jamendo.cli.find_and_download_live") as mock_live:
+        with patch("propresenter_jamendo.cli.find_and_download_live") as mock_search, \
+             patch("propresenter_jamendo.cli.download_live_from_url") as mock_dl:
             _run_main(tmp_path, songs=[FAKE_SONGS[0]], extra_argv=["--youtube-live"])
-        mock_live.assert_not_called()
+        mock_search.assert_not_called()
+        mock_dl.assert_not_called()
 
     def test_redownloads_when_audio_missing(self, tmp_path):
-        # Entry is in JSON but WAV file is absent — should re-download
+        # Entry is in JSON but WAV file is absent — re-downloads from stored URL
         existing = [{
             "artist": "Artist A", "song": "Song One", "duration": "0:03",
-            "youtube_url": self.URL, "captions_available": "no", "reject": "no",
+            "youtube_url": self.URL, "downloaded_url": self.URL,
+            "captions_available": "no", "reject": "no",
         }]
         (tmp_path / RESULTS_FILE).write_text(json.dumps(existing), encoding="utf-8")
-        # WAV deliberately not created — it's "missing" from disk
         wav = tmp_path / "Song One_live.wav"
-        with patch("propresenter_jamendo.cli.find_and_download_live",
-                   return_value=(wav, None, self.URL)) as mock_live:
+        with patch("propresenter_jamendo.cli.download_live_from_url",
+                   return_value=(wav, None)) as mock_dl:
             _run_main(tmp_path, songs=[FAKE_SONGS[0]], extra_argv=["--youtube-live"])
-        mock_live.assert_called_once()
+        mock_dl.assert_called_once()
 
     def test_removed_from_file_when_redownload_fails(self, tmp_path):
         # Entry is in JSON, audio is gone, re-download also fails → removed from file
         existing = [{
             "artist": "Artist A", "song": "Song One", "duration": "0:03",
-            "youtube_url": self.URL, "captions_available": "no", "reject": "no",
+            "youtube_url": self.URL, "downloaded_url": self.URL,
+            "captions_available": "no", "reject": "no",
         }]
         (tmp_path / RESULTS_FILE).write_text(json.dumps(existing), encoding="utf-8")
-        with patch("propresenter_jamendo.cli.find_and_download_live",
-                   return_value=(None, None, None)):
+        with patch("propresenter_jamendo.cli.download_live_from_url",
+                   return_value=(None, None)):
             _run_main(tmp_path, songs=[FAKE_SONGS[0]], extra_argv=["--youtube-live"])
         data = json.loads((tmp_path / RESULTS_FILE).read_text())
         assert data == []
+
+    # --- URL-change cases (Option A) ---
+
+    def test_redownloads_when_url_changed(self, tmp_path):
+        # User edited youtube_url to a new value — should fetch the new URL
+        new_url = "https://www.youtube.com/watch?v=NEW999"
+        existing = [{
+            "artist": "Artist A", "song": "Song One", "duration": "0:03",
+            "youtube_url": new_url, "downloaded_url": self.URL,
+            "captions_available": "no", "reject": "no",
+        }]
+        (tmp_path / RESULTS_FILE).write_text(json.dumps(existing), encoding="utf-8")
+        wav = tmp_path / "Song One_live.wav"
+        with patch("propresenter_jamendo.cli.download_live_from_url",
+                   return_value=(wav, None)) as mock_dl:
+            _run_main(tmp_path, songs=[FAKE_SONGS[0]], extra_argv=["--youtube-live"])
+        mock_dl.assert_called_once()
+        args_used = mock_dl.call_args[0]
+        assert args_used[0] == new_url
+
+    def test_downloaded_url_updated_after_url_change(self, tmp_path):
+        new_url = "https://www.youtube.com/watch?v=NEW999"
+        existing = [{
+            "artist": "Artist A", "song": "Song One", "duration": "0:03",
+            "youtube_url": new_url, "downloaded_url": self.URL,
+            "captions_available": "no", "reject": "no",
+        }]
+        (tmp_path / RESULTS_FILE).write_text(json.dumps(existing), encoding="utf-8")
+        wav = tmp_path / "Song One_live.wav"
+        wav.touch()
+        with patch("propresenter_jamendo.cli.download_live_from_url",
+                   return_value=(wav, None)):
+            _run_main(tmp_path, songs=[FAKE_SONGS[0]], extra_argv=["--youtube-live"])
+        entry = json.loads((tmp_path / RESULTS_FILE).read_text())[0]
+        assert entry["downloaded_url"] == new_url
+
+    def test_url_change_not_triggered_when_urls_match(self, tmp_path):
+        # Both fields are the same — should not call download_live_from_url for URL-change
+        wav = tmp_path / "Song One_live.wav"
+        wav.touch()
+        existing = [{
+            "artist": "Artist A", "song": "Song One", "duration": "0:03",
+            "youtube_url": self.URL, "downloaded_url": self.URL,
+            "captions_available": "no", "reject": "no",
+        }]
+        (tmp_path / RESULTS_FILE).write_text(json.dumps(existing), encoding="utf-8")
+        with patch("propresenter_jamendo.cli.download_live_from_url") as mock_dl:
+            _run_main(tmp_path, songs=[FAKE_SONGS[0]], extra_argv=["--youtube-live"])
+        mock_dl.assert_not_called()
+
+    def test_old_entry_without_downloaded_url_not_redownloaded(self, tmp_path):
+        # Entries created before downloaded_url was added should not trigger re-download
+        wav = tmp_path / "Song One_live.wav"
+        wav.touch()
+        existing = [{
+            "artist": "Artist A", "song": "Song One", "duration": "0:03",
+            "youtube_url": self.URL, "captions_available": "no", "reject": "no",
+            # no downloaded_url field
+        }]
+        (tmp_path / RESULTS_FILE).write_text(json.dumps(existing), encoding="utf-8")
+        with patch("propresenter_jamendo.cli.download_live_from_url") as mock_dl:
+            _run_main(tmp_path, songs=[FAKE_SONGS[0]], extra_argv=["--youtube-live"])
+        mock_dl.assert_not_called()
 
     def test_skips_rejected_songs(self, tmp_path):
         existing = [{

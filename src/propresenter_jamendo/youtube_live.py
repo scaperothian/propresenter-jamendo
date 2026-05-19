@@ -113,6 +113,18 @@ def _download_from_url(url: str, stem: str, output_dir: Path) -> tuple[Path | No
     return wav_path, caption_path
 
 
+def download_live_from_url(
+    url: str, song: dict, output_dir: Path
+) -> tuple[Path | None, Path | None]:
+    """Download a live performance from a specific YouTube URL.
+
+    Used when the user has manually updated youtube_url in found-live-results.json.
+    Returns (wav_path, caption_path). Either may be None on failure.
+    """
+    stem = safe_filename(song.get("title", "")) + "_live"
+    return _download_from_url(url, stem, output_dir)
+
+
 def find_and_download_live(
     song: dict, output_dir: Path
 ) -> tuple[Path | None, Path | None, str | None]:
