@@ -147,18 +147,21 @@ class TestSearchCandidates:
         assert "ytsearch5:my query" in cmd
 
 
+MOCK_NORMALIZE_YT = patch("propresenter_jamendo.youtube_live.normalize_peak")
+
+
 class TestDownloadFromUrl:
     def test_returns_wav_path_when_file_exists(self, tmp_path):
         wav = tmp_path / "My Song_live.wav"
         wav.touch()
-        with patch("propresenter_jamendo.youtube_live.subprocess.run"):
+        with patch("propresenter_jamendo.youtube_live.subprocess.run"), MOCK_NORMALIZE_YT:
             result_wav, _ = _download_from_url(
                 "https://www.youtube.com/watch?v=abc", "My Song_live", tmp_path
             )
         assert result_wav == wav
 
     def test_returns_none_when_wav_missing(self, tmp_path):
-        with patch("propresenter_jamendo.youtube_live.subprocess.run"):
+        with patch("propresenter_jamendo.youtube_live.subprocess.run"), MOCK_NORMALIZE_YT:
             result_wav, result_cap = _download_from_url(
                 "https://www.youtube.com/watch?v=abc", "My Song_live", tmp_path
             )
@@ -170,7 +173,7 @@ class TestDownloadFromUrl:
         wav.touch()
         cap = tmp_path / "My Song_live.en.srt"
         cap.touch()
-        with patch("propresenter_jamendo.youtube_live.subprocess.run"):
+        with patch("propresenter_jamendo.youtube_live.subprocess.run"), MOCK_NORMALIZE_YT:
             _, result_cap = _download_from_url(
                 "https://www.youtube.com/watch?v=abc", "My Song_live", tmp_path
             )
@@ -181,24 +184,40 @@ class TestDownloadFromUrl:
         wav.touch()
         cap = tmp_path / "My Song_live.en.vtt"
         cap.touch()
-        with patch("propresenter_jamendo.youtube_live.subprocess.run"):
+        with patch("propresenter_jamendo.youtube_live.subprocess.run"), MOCK_NORMALIZE_YT:
             _, result_cap = _download_from_url(
                 "https://www.youtube.com/watch?v=abc", "My Song_live", tmp_path
             )
         assert result_cap == cap
 
     def test_passes_url_to_yt_dlp(self, tmp_path):
-        with patch("propresenter_jamendo.youtube_live.subprocess.run") as mock_run:
+        with patch("propresenter_jamendo.youtube_live.subprocess.run") as mock_run, \
+             MOCK_NORMALIZE_YT:
             _download_from_url("https://www.youtube.com/watch?v=abc123", "stem", tmp_path)
         cmd = mock_run.call_args[0][0]
         assert "https://www.youtube.com/watch?v=abc123" in cmd
 
     def test_requests_wav_format(self, tmp_path):
-        with patch("propresenter_jamendo.youtube_live.subprocess.run") as mock_run:
+        with patch("propresenter_jamendo.youtube_live.subprocess.run") as mock_run, \
+             MOCK_NORMALIZE_YT:
             _download_from_url("https://www.youtube.com/watch?v=abc", "stem", tmp_path)
         cmd = mock_run.call_args[0][0]
         assert "--audio-format" in cmd
         assert "wav" in cmd
+
+    def test_normalize_called_when_wav_present(self, tmp_path):
+        wav = tmp_path / "My Song_live.wav"
+        wav.touch()
+        with patch("propresenter_jamendo.youtube_live.subprocess.run"), \
+             patch("propresenter_jamendo.youtube_live.normalize_peak") as mock_norm:
+            _download_from_url("https://www.youtube.com/watch?v=abc", "My Song_live", tmp_path)
+        mock_norm.assert_called_once_with(wav)
+
+    def test_normalize_not_called_when_wav_absent(self, tmp_path):
+        with patch("propresenter_jamendo.youtube_live.subprocess.run"), \
+             patch("propresenter_jamendo.youtube_live.normalize_peak") as mock_norm:
+            _download_from_url("https://www.youtube.com/watch?v=abc", "stem", tmp_path)
+        mock_norm.assert_not_called()
 
 
 class TestFindAndDownloadLive:
@@ -227,7 +246,7 @@ class TestFindAndDownloadLive:
         wav_file = tmp_path / "Give Me the Same_live.wav"
         wav_file.touch()
         with patch("propresenter_jamendo.youtube_live._search_candidates", return_value=self.CANDIDATES), \
-             patch("propresenter_jamendo.youtube_live.subprocess.run"):
+             patch("propresenter_jamendo.youtube_live.subprocess.run"), MOCK_NORMALIZE_YT:
             wav, _, _ = find_and_download_live(SONG_WITH_DURATION, tmp_path)
         assert wav == wav_file
 
@@ -235,7 +254,7 @@ class TestFindAndDownloadLive:
         wav_file = tmp_path / "Give Me the Same_live.wav"
         wav_file.touch()
         with patch("propresenter_jamendo.youtube_live._search_candidates", return_value=self.CANDIDATES), \
-             patch("propresenter_jamendo.youtube_live.subprocess.run"):
+             patch("propresenter_jamendo.youtube_live.subprocess.run"), MOCK_NORMALIZE_YT:
             _, _, url = find_and_download_live(SONG_WITH_DURATION, tmp_path)
         assert url == "https://www.youtube.com/watch?v=abc123"
 
@@ -243,7 +262,7 @@ class TestFindAndDownloadLive:
         wav_file = tmp_path / "Give Me the Same_live.wav"
         wav_file.touch()
         with patch("propresenter_jamendo.youtube_live._search_candidates", return_value=self.CANDIDATES), \
-             patch("propresenter_jamendo.youtube_live.subprocess.run") as mock_run:
+             patch("propresenter_jamendo.youtube_live.subprocess.run") as mock_run, MOCK_NORMALIZE_YT:
             find_and_download_live(SONG_WITH_DURATION, tmp_path)
         cmd = mock_run.call_args[0][0]
         assert "Give Me the Same_live" in " ".join(cmd)
@@ -252,7 +271,7 @@ class TestFindAndDownloadLive:
         wav_file = tmp_path / "Give Me the Same_live.wav"
         wav_file.touch()
         with patch("propresenter_jamendo.youtube_live._search_candidates", return_value=self.CANDIDATES), \
-             patch("propresenter_jamendo.youtube_live.subprocess.run") as mock_run:
+             patch("propresenter_jamendo.youtube_live.subprocess.run") as mock_run, MOCK_NORMALIZE_YT:
             find_and_download_live(SONG_WITH_DURATION, tmp_path)
         cmd = mock_run.call_args[0][0]
         assert "abc123" in " ".join(cmd)

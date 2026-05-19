@@ -1,3 +1,4 @@
+"""Studio audio download and WAV conversion for propresenter-jamendo."""
 import subprocess
 from pathlib import Path
 
@@ -5,6 +6,7 @@ from huggingface_hub import hf_hub_download
 
 from propresenter_jamendo.downloader import REPO_ID
 from propresenter_jamendo.formatter import safe_filename
+from propresenter_jamendo.normalize import normalize_peak
 
 
 def download_audio(song: dict, output_dir: Path) -> Path:
@@ -22,4 +24,5 @@ def download_audio(song: dict, output_dir: Path) -> Path:
         check=True,
         capture_output=True,
     )
+    normalize_peak(wav_path)
     return wav_path

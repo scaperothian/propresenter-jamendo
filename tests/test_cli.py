@@ -36,6 +36,7 @@ def _run_main(tmp_path, songs=None, extra_argv=None):
                return_value=songs if songs is not None else FAKE_SONGS), \
          patch("propresenter_jamendo.audio.hf_hub_download", return_value="/fake/audio.mp3"), \
          patch("propresenter_jamendo.audio.subprocess.run"), \
+         patch("propresenter_jamendo.audio.normalize_peak"), \
          patch("sys.argv", argv):
         main()
 

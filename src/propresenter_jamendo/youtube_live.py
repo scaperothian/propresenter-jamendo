@@ -4,6 +4,7 @@ import subprocess
 from pathlib import Path
 
 from propresenter_jamendo.formatter import safe_filename
+from propresenter_jamendo.normalize import normalize_peak
 
 LIVE_KEYWORDS = frozenset({"live", "concert", "session", "acoustic", "unplugged"})
 # If a YouTube video's duration is within this fraction of the studio track, skip it —
@@ -101,6 +102,8 @@ def _download_from_url(url: str, stem: str, output_dir: Path) -> tuple[Path | No
     wav_path = output_dir / f"{stem}.wav"
     if not wav_path.exists():
         return None, None
+
+    normalize_peak(wav_path)
 
     caption_path = None
     for ext in ("srt", "vtt"):

@@ -168,9 +168,10 @@ propresenter-jamendo/
 │       ├── cli.py            # CLI entry point (--output-dir, --youtube-live)
 │       ├── downloader.py     # Fetches English metadata.jsonl from HuggingFace
 │       ├── formatter.py      # Pairs lyric lines, sanitizes filenames
-│       ├── audio.py          # Downloads MP3 and converts to WAV via ffmpeg
+│       ├── audio.py          # Downloads MP3, converts to WAV, peak-normalizes
+│       ├── normalize.py      # Peak normalization to full scale (0 dBFS)
 │       ├── presentation.py   # Builds ProPresenter-compatible JSON
-│       └── youtube_live.py   # YouTube live search + yt-dlp download
+│       └── youtube_live.py   # YouTube live search, yt-dlp download, peak-normalizes
 ├── tests/                    # Pytest suite (mirrors src/ structure)
 ├── venv/                     # Local virtual environment (not committed)
 ├── pyproject.toml            # Poetry dependency declarations

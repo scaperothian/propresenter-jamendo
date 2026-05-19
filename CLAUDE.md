@@ -122,6 +122,7 @@ The package has one module per responsibility:
 | `downloader.py` | Fetches `subsets/en/metadata.jsonl` from HuggingFace (no audio encoding step) |
 | `formatter.py` | Groups lyric lines into pairs for `.txt` output; sanitizes filenames |
 | `audio.py` | Downloads the per-song MP3 and converts to WAV via `ffmpeg` subprocess |
+| `normalize.py` | Peak-normalizes a WAV file to full scale (0 dBFS) using torchaudio |
 | `presentation.py` | Pairs lyric lines with timing data; builds the ProPresenter JSON structure |
 | `youtube_live.py` | Searches YouTube for live performances; downloads `<name>_live.wav` + captions via `yt-dlp` |
 
@@ -193,9 +194,10 @@ propresenter-jamendo/
 │       ├── cli.py            # CLI entry point (--output-dir, --youtube-live)
 │       ├── downloader.py     # HuggingFace metadata fetch
 │       ├── formatter.py      # Lyric pairing and filename sanitization
-│       ├── audio.py          # MP3 download + WAV conversion
+│       ├── audio.py          # MP3 download + WAV conversion + peak normalization
+│       ├── normalize.py      # Peak normalization (shared by audio.py and youtube_live.py)
 │       ├── presentation.py   # ProPresenter JSON builder
-│       └── youtube_live.py   # YouTube live search + yt-dlp download
+│       └── youtube_live.py   # YouTube live search + yt-dlp download + peak normalization
 ├── tests/                    # Pytest suite (mirrors src/ structure)
 ├── venv/                     # Local Python environment (not in git)
 ├── pyproject.toml            # Dependency declarations (Poetry)
